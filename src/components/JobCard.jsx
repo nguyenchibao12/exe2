@@ -1,14 +1,23 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { MapPin, DollarSign, Calendar, Users, Star, Heart } from 'lucide-react';
 
-function JobCard({ job, isSaved, onToggleSave }) {
-  const navigate = useNavigate();
+function JobCard({ job, isSaved, onToggleSave, onClick }) {
+  
+  const handleCardClick = () => {
+    if (onClick) {
+      onClick(job);
+    }
+  };
+
+  const handleSaveClick = (e) => {
+    e.stopPropagation();
+    onToggleSave(job.id);
+  };
 
   return (
     <div 
       className="bg-white rounded-2xl p-6 hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 group"
-      onClick={() => navigate(`/job/${job.id}`)}
+      onClick={handleCardClick}
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex gap-3">
@@ -23,10 +32,7 @@ function JobCard({ job, isSaved, onToggleSave }) {
           </div>
         </div>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleSave(job.id);
-          }}
+          onClick={handleSaveClick}
           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
         >
           <Heart
@@ -70,9 +76,9 @@ function JobCard({ job, isSaved, onToggleSave }) {
             <span className="font-medium">{job.rating}</span>
           </div>
         </div>
-        <button className="text-indigo-600 font-medium text-sm hover:underline">
+        <span className="text-indigo-600 font-medium text-sm group-hover:underline">
           Xem chi tiết →
-        </button>
+        </span>
       </div>
     </div>
   );

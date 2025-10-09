@@ -63,6 +63,18 @@ function Navigation() {
             <button className="p-2 hover:bg-gray-100 rounded-lg">
               <MessageSquare className="w-5 h-5 text-gray-600" />
             </button>
+            <Link 
+              to="/login" 
+              className="hidden md:block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+            >
+              Đăng nhập
+            </Link>
+            <Link 
+              to="/register" 
+              className="hidden md:block px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+            >
+              Đăng ký
+            </Link>
             <Link to="/profile" className="p-2 hover:bg-gray-100 rounded-lg">
               <User className="w-5 h-5 text-gray-600" />
             </Link>
@@ -79,14 +91,41 @@ function Navigation() {
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t border-gray-200">
             <nav className="flex flex-col gap-2">
-              <Link to="/jobs" className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg">
+              <Link 
+                to="/jobs" 
+                className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg"
+                onClick={() => setIsMenuOpen(false)}
+              >
                 Tìm việc
               </Link>
-              <Link to="/post-job" className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg">
+              <Link 
+                to="/post-job" 
+                className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg"
+                onClick={() => setIsMenuOpen(false)}
+              >
                 Đăng tuyển
               </Link>
-              <Link to="/blog" className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg">
+              <Link 
+                to="/blog" 
+                className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg"
+                onClick={() => setIsMenuOpen(false)}
+              >
                 Blog
+              </Link>
+              <div className="border-t border-gray-200 my-2"></div>
+              <Link 
+                to="/login" 
+                className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Đăng nhập
+              </Link>
+              <Link 
+                to="/register" 
+                className="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg text-center"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Đăng ký
               </Link>
             </nav>
           </div>
