@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import Navigation from './components/Navigation';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
@@ -23,20 +24,22 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navigation />
-      <Routes>
-        <Route path="/" element={<HomePage savedJobs={savedJobs} toggleSaveJob={toggleSaveJob} />} />
-        <Route path="/jobs" element={<JobsPage savedJobs={savedJobs} toggleSaveJob={toggleSaveJob} />} />
-        <Route path="/job/:id" element={<JobDetailPage savedJobs={savedJobs} toggleSaveJob={toggleSaveJob} />} />
-        <Route path="/post-job" element={<PostJobPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/blog" element={<BlogPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-      </Routes>
-      <Footer />
-    </div>
+    <AuthProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <Routes>
+          <Route path="/" element={<HomePage savedJobs={savedJobs} toggleSaveJob={toggleSaveJob} />} />
+          <Route path="/jobs" element={<JobsPage savedJobs={savedJobs} toggleSaveJob={toggleSaveJob} />} />
+          <Route path="/job/:id" element={<JobDetailPage savedJobs={savedJobs} toggleSaveJob={toggleSaveJob} />} />
+          <Route path="/post-job" element={<PostJobPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/blog" element={<BlogPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Routes>
+        <Footer />
+      </div>
+    </AuthProvider>
   );
 }
 
