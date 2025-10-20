@@ -6,19 +6,19 @@ function PostJobPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    title: '',
-    company: '',
-    logo: '🏢',
-    location: '',
-    salary: '',
+    title: 'Tuyển dụng [Tên Công việc Mới]',
+    company: 'Công ty ABC Tech',
+    logo: '✨',
+    location: 'Remote',
+    salary: '70-100k/giờ',
     type: 'Part-time',
-    workDays: '',
-    workHours: '',
-    description: '',
-    requirements: '',
-    benefits: '',
-    contactEmail: '',
-    contactPhone: ''
+    workDays: 'Thứ 2 đến Thứ 6',
+    workHours: 'Linh động',
+    description: 'Mô tả chi tiết công việc của chúng tôi.\nChúng tôi cần một sinh viên năng động, sáng tạo và có trách nhiệm.',
+    requirements: 'Kỹ năng A\nKỹ năng B\nCó laptop riêng',
+    benefits: 'Phụ cấp ăn trưa\nThưởng dự án',
+    contactEmail: 'hr@companyabc.com',
+    contactPhone: '0901234567'
   });
 
   const [paymentMethod, setPaymentMethod] = useState('momo');
@@ -28,8 +28,14 @@ function PostJobPage() {
     if (step < 3) {
       setStep(step + 1);
     } else {
-      console.log('Post job with payment:', formData, paymentMethod);
-      alert('Đăng tin thành công! Đang chuyển đến trang thanh toán...');
+      // Logic Mock: Xử lý thanh toán và đăng tin
+      console.log('Post job data:', formData, 'Payment Method:', paymentMethod);
+      
+      // Giả lập thêm job mới vào state hoặc list job (Nếu có Global State)
+      // Hiện tại chỉ alert để demo thành công
+      alert(`Thanh toán thành công qua ${paymentMethod.toUpperCase()}! Tin đăng đang được duyệt và sẽ xuất hiện trên trang Việc làm.`);
+      
+      // Chuyển hướng đến trang Jobs để xem kết quả
       navigate('/jobs');
     }
   };

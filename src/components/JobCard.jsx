@@ -1,23 +1,20 @@
 import React from 'react';
 import { MapPin, DollarSign, Calendar, Users, Star, Heart } from 'lucide-react';
+import { Link } from 'react-router-dom'; // NEW IMPORT
 
 function JobCard({ job, isSaved, onToggleSave, onClick }) {
   
-  const handleCardClick = () => {
-    if (onClick) {
-      onClick(job);
-    }
-  };
-
   const handleSaveClick = (e) => {
     e.stopPropagation();
     onToggleSave(job.id);
   };
-
-  return (
+  
+  // Tạo nội dung card để sử dụng cho cả Link và div
+  const CardContent = (
     <div 
       className="bg-white rounded-2xl p-6 hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 group"
-      onClick={handleCardClick}
+      // onClick chỉ được gắn khi có prop này (dùng cho modal trên HomePage)
+      onClick={onClick} 
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex gap-3">
@@ -33,7 +30,7 @@ function JobCard({ job, isSaved, onToggleSave, onClick }) {
         </div>
         <button
           onClick={handleSaveClick}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
         >
           <Heart
             className={`w-5 h-5 ${isSaved ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
@@ -77,10 +74,19 @@ function JobCard({ job, isSaved, onToggleSave, onClick }) {
           </div>
         </div>
         <span className="text-indigo-600 font-medium text-sm group-hover:underline">
-          Xem chi tiết →
+          Xem chi tiết &rarr;
         </span>
       </div>
     </div>
+  );
+  
+  // Logic hiển thị: Nếu có onClick, dùng div. Nếu không, dùng Link để navigate.
+  return onClick ? (
+    CardContent
+  ) : (
+    <Link to={`/jobs/${job.id}`}>
+      {CardContent}
+    </Link>
   );
 }
 

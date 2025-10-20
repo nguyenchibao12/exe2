@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff, Briefcase, Phone } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 function RegisterPage() {
   const navigate = useNavigate();
+  const { register } = useAuth(); 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [userType, setUserType] = useState('student'); // student or employer
@@ -16,15 +18,29 @@ function RegisterPage() {
     agreeTerms: false
   });
 
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
       alert('Mật khẩu không khớp!');
       return;
     }
-    // TODO: Implement registration logic
-    console.log('Register data:', { ...formData, userType });
-    navigate('/login');
+
+    const newUserData = {
+      id: Date.now(),
+      name: formData.name,
+      email: formData.email,
+      role: userType, // Gán role từ nút chọn
+      avatar: null
+    };
+    
+    // Mock: Thực hiện đăng ký và tự động login
+    register(newUserData);
+    alert(`Đăng ký thành công! Bạn đã được đăng nhập với vai trò ${userType === 'student' ? 'Sinh viên' : 'Nhà tuyển dụng'}.`);
+    navigate('/profile'); // Chuyển đến trang profile sau khi đăng ký
   };
 
   return (
@@ -82,9 +98,10 @@ function RegisterPage() {
                   type="text"
                   required
                   placeholder="Nguyễn Văn A"
+                  name="name"
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={handleChange}
                 />
               </div>
             </div>
@@ -100,9 +117,10 @@ function RegisterPage() {
                   type="email"
                   required
                   placeholder="your.email@example.com"
+                  name="email"
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={handleChange}
                 />
               </div>
             </div>
@@ -118,9 +136,10 @@ function RegisterPage() {
                   type="tel"
                   required
                   placeholder="0123456789"
+                  name="phone"
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={handleChange}
                 />
               </div>
             </div>
@@ -136,9 +155,10 @@ function RegisterPage() {
                   type={showPassword ? 'text' : 'password'}
                   required
                   placeholder="••••••••"
+                  name="password"
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={handleChange}
                 />
                 <button
                   type="button"
@@ -161,9 +181,10 @@ function RegisterPage() {
                   type={showConfirmPassword ? 'text' : 'password'}
                   required
                   placeholder="••••••••"
+                  name="confirmPassword"
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                   value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  onChange={handleChange}
                 />
                 <button
                   type="button"
