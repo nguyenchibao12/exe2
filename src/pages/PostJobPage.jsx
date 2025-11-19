@@ -4,10 +4,11 @@ import axios from 'axios';
 import { Briefcase, MapPin, DollarSign, CheckCircle, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { LOCATIONS } from '../data/locations';
+import { API_BASE_URL } from '../config/api'; // ✅ THÊM DÒNG NÀY
 
 function PostJobPage() {
   const navigate = useNavigate();
-  const { token } = useAuth(); // ✅ Dùng token từ context
+  const { token } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -40,20 +41,21 @@ function PostJobPage() {
       try {
         setLoading(true);
 
+        // ✅ SỬA DỤNG API_BASE_URL thay vì hardcode localhost
         const response = await axios.post(
-          'http://localhost:5000/api/jobs',
+          `${API_BASE_URL}/api/jobs`,
           formData,
           {
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`, // ✅ gửi kèm token
+              Authorization: `Bearer ${token}`,
             },
           }
         );
 
-        const newJob = response.data.job; // ✅ fix chỗ này
+        const newJob = response.data.job;
         alert('✅ Tạo công việc thành công! Chuyển đến bước thanh toán...');
-        navigate(`/payment/${newJob._id}`); // 🔗 Sang trang thanh toán
+        navigate(`/payment/${newJob._id}`);
 
       } catch (error) {
         console.error('❌ Error creating job:', error);
@@ -62,7 +64,10 @@ function PostJobPage() {
           alert('⚠️ Phiên đăng nhập hết hạn hoặc chưa đăng nhập. Vui lòng đăng nhập lại!');
           navigate('/login');
         } else {
-          alert('Lỗi khi tạo công việc. Vui lòng thử lại.');
+          // ✅ Hiển thị chi tiết lỗi để debug
+          const errorMsg = error.response?.data?.message || error.message || 'Lỗi không xác định';
+          alert(`❌ Lỗi khi tạo công việc: ${errorMsg}`);
+          console.error('Full error:', error.response?.data);
         }
       } finally {
         setLoading(false);
@@ -261,7 +266,7 @@ function PostJobPage() {
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold mb-2">Xác nhận đăng tin</h2>
             <p className="text-gray-600 mb-6">
-              Bấm “Thanh toán” để hoàn tất đăng tin công việc.
+              Bấm "Thanh toán" để hoàn tất đăng tin công việc.
             </p>
           </div>
         )}
@@ -280,7 +285,7 @@ function PostJobPage() {
           <button
             type="submit"
             disabled={loading}
-            className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700"
+            className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Đang xử lý...' : step === 2 ? 'Thanh toán' : 'Tiếp tục'}
           </button>
