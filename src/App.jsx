@@ -12,36 +12,41 @@ import BlogPage from './pages/BlogPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import SavedJobsPage from './pages/SavedJobsPage';
-import ApplicationsPage from './pages/ApplicationsPage'; // Import đã có
+import ApplicationsPage from './pages/ApplicationsPage';
 import CVPreviewPage from './pages/CVPreviewPage';
 import EmployerDashboardPage from './pages/EmployerDashboardPage';
 import ApplicationSuccessPage from './pages/ApplicationSuccessPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import ApplicantListPage from './pages/ApplicantListPage';
+import AdminPendingJobsPage from './pages/AdminPendingJobsPage';
+import AdminRecruiterProfilePage from './pages/AdminRecruiterProfilePage';
+import AdminBlogManagementPage from './pages/AdminBlogManagementPage';
+import CreateBlogPage from './pages/CreateBlogPage';
+import PaymentPage from './pages/PaymentPage';
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   const [savedJobs, setSavedJobs] = useState([]);
-  // **** THÊM STATE MỚI CHO CÁC JOB ĐÃ ỨNG TUYỂN ****
-  const [appliedJobs, setAppliedJobs] = useState([]); // Lưu mảng các job ID
+  const [appliedJobs, setAppliedJobs] = useState([]);
 
   const toggleSaveJob = (jobId) => {
-     setSavedJobs(prev =>
+    setSavedJobs(prev =>
       prev.includes(jobId)
         ? prev.filter(id => id !== jobId)
         : [...prev, jobId]
     );
   };
 
-  // **** HÀM MỚI ĐỂ THÊM JOB VÀO DANH SÁCH ĐÃ ỨNG TUYỂN ****
   const addApplication = (jobId) => {
-    // Chỉ thêm nếu chưa có trong danh sách
     setAppliedJobs(prev => {
       if (!prev.includes(jobId)) {
         return [...prev, jobId];
       }
-      return prev; // Không thay đổi nếu đã tồn tại
+      return prev;
     });
-     console.log("Applied Jobs State:", appliedJobs); // Log để kiểm tra
   };
-
 
   return (
     <AuthProvider>
@@ -49,30 +54,131 @@ function App() {
         <Navigation />
         <main className="flex-grow bg-gray-50">
           <Routes>
-            <Route path="/" element={<HomePage savedJobs={savedJobs} toggleSaveJob={toggleSaveJob} />} />
-            <Route path="/jobs" element={<JobsPage savedJobs={savedJobs} toggleSaveJob={toggleSaveJob} />} />
+            {/* ========================================
+                PUBLIC ROUTES - Không cần đăng nhập
+            ======================================== */}
             <Route
-              path="/job/:id"
-              // Truyền hàm addApplication xuống JobDetailPage
-              element={<JobDetailPage savedJobs={savedJobs} toggleSaveJob={toggleSaveJob} addApplication={addApplication} />}
+              path="/"
+              element={<HomePage savedJobs={savedJobs} toggleSaveJob={toggleSaveJob} />}
             />
-            <Route path="/post-job" element={<PostJobPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
+            <Route
+              path="/jobs"
+              element={<JobsPage savedJobs={savedJobs} toggleSaveJob={toggleSaveJob} />}
+            />
+            <Route
+              path="/job/:jobId"
+              element={
+                <JobDetailPage
+                  savedJobs={savedJobs}
+                  toggleSaveJob={toggleSaveJob}
+                  addApplication={addApplication}
+                />
+              }
+            />
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+
+            {/* ========================================
+                STUDENT ROUTES
+            ======================================== */}
+            <Route path="/profile" element={<ProfilePage />} />
             <Route
               path="/my-jobs"
               element={<SavedJobsPage savedJobs={savedJobs} toggleSaveJob={toggleSaveJob} />}
             />
             <Route
               path="/applications"
-              // Truyền state appliedJobs xuống ApplicationsPage
               element={<ApplicationsPage appliedJobs={appliedJobs} />}
             />
             <Route path="/cv-preview" element={<CVPreviewPage />} />
-            <Route path="/employer/dashboard" element={<EmployerDashboardPage />} />
             <Route path="/apply-success" element={<ApplicationSuccessPage />} />
+
+            {/* ========================================
+                RECRUITER ROUTES - ✅ ĐÃ FIX
+            ======================================== */}
+            <Route
+              path="/post-job"
+              element={
+                <ProtectedRoute allowedRoles={["recruiter"]}>
+                  <PostJobPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/employer/dashboard"
+              element={
+                <ProtectedRoute allowedRoles={["recruiter"]}>
+                  <EmployerDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* ✅ SỬA: Thêm ProtectedRoute cho Payment */}
+            <Route
+              path="/payment/:jobId"
+              element={
+                <ProtectedRoute allowedRoles={["recruiter"]}>
+                  <PaymentPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ SỬA: Thêm ProtectedRoute cho Applicant List */}
+            <Route
+              path="/employer/job/:jobId/applicants"
+              element={
+                <ProtectedRoute allowedRoles={["recruiter"]}>
+                  <ApplicantListPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ========================================
+                ADMIN ROUTES
+            ======================================== */}
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/pending-jobs"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminPendingJobsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/recruiter/:recruiterId"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminRecruiterProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/blogs"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminBlogManagementPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/blog/create"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "recruiter"]}>
+                  <CreateBlogPage />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </main>
         <Footer />

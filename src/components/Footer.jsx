@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Briefcase, Facebook, Instagram, Linkedin, Mail } from 'lucide-react';
 
 function Footer() {
@@ -21,30 +22,26 @@ function Footer() {
           <div>
             <h3 className="font-semibold text-white mb-4">Về chúng tôi</h3>
             <ul className="space-y-2 text-sm">
-              <li><a href="#" className="hover:text-indigo-400">Giới thiệu</a></li>
-              <li><a href="#" className="hover:text-indigo-400">Liên hệ</a></li>
-              <li><a href="#" className="hover:text-indigo-400">Blog</a></li>
-              <li><a href="#" className="hover:text-indigo-400">Câu hỏi thường gặp</a></li>
+              <li><Link to="/" className="hover:text-indigo-400 transition-colors">Trang chủ</Link></li>
+              <li><Link to="/blog" className="hover:text-indigo-400 transition-colors">Blog</Link></li>
             </ul>
           </div>
 
           <div>
             <h3 className="font-semibold text-white mb-4">Dành cho sinh viên</h3>
             <ul className="space-y-2 text-sm">
-              <li><a href="#" className="hover:text-indigo-400">Tìm việc làm</a></li>
-              <li><a href="#" className="hover:text-indigo-400">Tạo hồ sơ</a></li>
-              <li><a href="#" className="hover:text-indigo-400">Lưu công việc</a></li>
-              <li><a href="#" className="hover:text-indigo-400">Hướng dẫn ứng tuyển</a></li>
+              <li><Link to="/jobs" className="hover:text-indigo-400 transition-colors">Tìm việc làm</Link></li>
+              <li><Link to="/profile" className="hover:text-indigo-400 transition-colors">Tạo hồ sơ</Link></li>
+              <li><Link to="/my-jobs" className="hover:text-indigo-400 transition-colors">Công việc đã lưu</Link></li>
+              <li><Link to="/applications" className="hover:text-indigo-400 transition-colors">Đơn ứng tuyển</Link></li>
             </ul>
           </div>
 
           <div>
             <h3 className="font-semibold text-white mb-4">Nhà tuyển dụng</h3>
             <ul className="space-y-2 text-sm">
-              <li><a href="#" className="hover:text-indigo-400">Đăng tin tuyển dụng</a></li>
-              <li><a href="#" className="hover:text-indigo-400">Tìm ứng viên</a></li>
-              <li><a href="#" className="hover:text-indigo-400">Bảng giá</a></li>
-              <li><a href="#" className="hover:text-indigo-400">Hỗ trợ</a></li>
+              <li><Link to="/post-job" className="hover:text-indigo-400 transition-colors">Đăng tin tuyển dụng</Link></li>
+              <li><Link to="/register" className="hover:text-indigo-400 transition-colors">Đăng ký tài khoản</Link></li>
             </ul>
           </div>
         </div>

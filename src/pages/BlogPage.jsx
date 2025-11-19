@@ -1,10 +1,44 @@
-import React, { useState } from 'react';
-import { Clock, User, ArrowRight, X, Calendar } from 'lucide-react';
-// Sửa đường dẫn import
-import { blogPosts } from '../data/data.js'; // <--- SỬA LẠI ĐÚNG ĐƯỜNG DẪN
+import React, { useState, useEffect } from 'react';
+import { Clock, User, ArrowRight, X, Calendar, Loader2, Filter } from 'lucide-react';
+import axios from 'axios';
+
+import { API_BASE_URL } from '../config/api';
 
 function BlogPage() {
   const [selectedPost, setSelectedPost] = useState(null);
+  const [blogPosts, setBlogPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const categories = ['all', 'Hướng dẫn', 'Kinh nghiệm', 'Tin tức', 'Tips', 'Khác'];
+
+  useEffect(() => {
+    fetchBlogs();
+  }, [selectedCategory, searchQuery]);
+
+  const fetchBlogs = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (selectedCategory !== 'all') {
+        params.append('category', selectedCategory);
+      }
+      if (searchQuery) {
+        params.append('search', searchQuery);
+      }
+
+      const response = await axios.get(`${API_BASE_URL}/api/blogs?${params.toString()}`);
+      setBlogPosts(response.data || []);
+    } catch (err) {
+      console.error('Error fetching blogs:', err.response || err);
+      setError('Không thể tải danh sách blog.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Phần JSX giữ nguyên như trước, chỉ sửa đường dẫn import ở trên
 
@@ -19,17 +53,67 @@ function BlogPage() {
           </p>
         </div>
 
+        {/* Filter & Search */}
+        <div className="mb-8 flex flex-col sm:flex-row gap-4 items-center justify-between">
+          <div className="flex flex-wrap gap-2">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedCategory === cat
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {cat === 'all' ? 'Tất cả' : cat}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 max-w-md w-full">
+            <input
+              type="text"
+              placeholder="Tìm kiếm blog..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        {/* Loading */}
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+            <span className="ml-3 text-gray-600">Đang tải blog...</span>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center mb-8">
+            <p className="text-red-800">{error}</p>
+          </div>
+        )}
+
         {/* Blog Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {blogPosts.map(post => (
+        {!loading && !error && (
+          <>
+            {blogPosts.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {blogPosts.map(post => (
             <article
-              key={post.id}
+              key={post._id}
               className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer group"
               onClick={() => setSelectedPost(post)}
             >
               {/* Image/Icon */}
-              <div className="h-48 bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-6xl group-hover:scale-105 transition-transform">
-                {post.image}
+              <div className="h-48 bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-6xl group-hover:scale-105 transition-transform overflow-hidden">
+                {post.image?.startsWith('http') ? (
+                  <img src={post.image} alt={post.title} className="w-full h-full object-cover" />
+                ) : (
+                  <span>{post.image || '📝'}</span>
+                )}
               </div>
 
               {/* Content */}
@@ -54,11 +138,15 @@ function BlogPage() {
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <User className="w-4 h-4" />
-                    <span>{post.author}</span>
+                    <span>{post.author?.name || post.author?.companyName || 'N/A'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <Calendar className="w-4 h-4" />
-                    <span>{post.date}</span>
+                    <span>
+                      {post.publishedAt
+                        ? new Date(post.publishedAt).toLocaleDateString('vi-VN')
+                        : new Date(post.createdAt).toLocaleDateString('vi-VN')}
+                    </span>
                   </div>
                 </div>
 
@@ -67,8 +155,15 @@ function BlogPage() {
                 </button>
               </div>
             </article>
-          ))}
-        </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 bg-white rounded-lg shadow border border-gray-100">
+                <p className="text-gray-500 text-lg">Không tìm thấy blog nào.</p>
+              </div>
+            )}
+          </>
+        )}
 
         {/* Blog Detail Modal */}
         {selectedPost && (
@@ -90,11 +185,15 @@ function BlogPage() {
                   <div className="flex items-center gap-4 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4" />
-                      <span>{selectedPost.author}</span>
+                      <span>{selectedPost.author?.name || selectedPost.author?.companyName || 'N/A'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
-                      <span>{selectedPost.date}</span>
+                      <span>
+                        {selectedPost.publishedAt
+                          ? new Date(selectedPost.publishedAt).toLocaleDateString('vi-VN')
+                          : new Date(selectedPost.createdAt).toLocaleDateString('vi-VN')}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -109,8 +208,12 @@ function BlogPage() {
               {/* Content */}
               <div className="p-6 md:p-8 max-h-[70vh] overflow-y-auto">
                 {/* Featured Image */}
-                <div className="h-64 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl flex items-center justify-center text-8xl mb-8">
-                  {selectedPost.image}
+                <div className="h-64 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl flex items-center justify-center mb-8 overflow-hidden">
+                  {selectedPost.image?.startsWith('http') ? (
+                    <img src={selectedPost.image} alt={selectedPost.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-8xl">{selectedPost.image || '📝'}</span>
+                  )}
                 </div>
 
                 {/* Article Content */}

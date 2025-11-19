@@ -1,100 +1,184 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom'; // Thêm useNavigate
-import { FileText, Briefcase, MapPin, Building, Clock, Check } from 'lucide-react'; // Thêm icons
-import { allJobs } from '../data/data.js'; // Import data job
-import { useAuth } from '../context/AuthContext'; // Import để check login
+import React, { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  Briefcase,
+  MapPin,
+  Clock,
+  FileText,
+  Loader2,
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import axios from "axios";
 
-// **** NHẬN PROP appliedJobs ****
-function ApplicationsPage({ appliedJobs }) {
+import { API_BASE_URL } from '../config/api';
+
+// ✅ Helper format trạng thái
+const getStatusClasses = (status) => {
+  switch (status) {
+    case "Approved":
+      return "bg-green-100 text-green-700";
+    case "Rejected":
+      return "bg-red-100 text-red-700";
+    default:
+      return "bg-yellow-100 text-yellow-700";
+  }
+};
+
+function ApplicationsPage() {
+  const { user, isAuthenticated, loading, token } = useAuth();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth(); // Kiểm tra đăng nhập
+  const [applications, setApplications] = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Lọc ra thông tin đầy đủ của các job đã ứng tuyển
-  const applications = allJobs.filter(job => appliedJobs.includes(job.id));
+  useEffect(() => {
+    if (!loading) {
+      // 1️⃣ Kiểm tra quyền
+      if (!isAuthenticated || user?.role !== "student") {
+        navigate("/login", { replace: true, state: { from: "/applications" } });
+        return;
+      }
 
-  // Thêm trạng thái giả định cho từng application
-  const applicationsWithStatus = applications.map((app, index) => ({
-      ...app,
-      // Tạo status giả: cái đầu 'Đang xem xét', còn lại 'Đã nộp'
-      status: index === 0 ? 'Đang xem xét' : 'Đã nộp',
-      appliedDate: `Ngày ${15 + index}/10/2024` // Ngày giả định
-  }));
+      // 2️⃣ Fetch applications
+      const fetchApplications = async () => {
+        setDataLoading(true);
+        setError(null);
+        try {
+          const res = await axios.get(`${API_BASE_URL}/api/applications/my`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setApplications(res.data || []);
+        } catch (err) {
+          console.error("[Applications] Fetch error:", err.response || err);
+          setError("Không thể tải danh sách đơn ứng tuyển của bạn.");
+          setApplications([]);
+        } finally {
+          setDataLoading(false);
+        }
+      };
 
-   // Nếu chưa đăng nhập, hiển thị thông báo
-   if (!isAuthenticated) {
-     return (
-        <div className="min-h-screen py-12 flex items-center justify-center px-4">
-             <div className="max-w-md w-full text-center bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-                <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h1 className="text-2xl font-bold text-gray-800 mb-3">Xem đơn ứng tuyển</h1>
-                <p className="text-gray-500 mb-6 text-sm">Vui lòng đăng nhập để xem danh sách các công việc bạn đã ứng tuyển.</p>
-                <Link to="/login" state={{ from: '/applications' }} className="inline-block px-6 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm">Đăng nhập</Link>
-             </div>
-        </div>
-     );
-   }
+      fetchApplications();
+    }
+  }, [loading, isAuthenticated, user, navigate, token]);
 
-  // --- Giao diện khi đã đăng nhập ---
+  // 3️⃣ Loading states
+  if (loading || (!dataLoading && (!isAuthenticated || user?.role !== "student"))) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (dataLoading) {
+    return (
+      <div className="min-h-screen py-12 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+        <p className="ml-3 text-gray-600">Đang tải đơn ứng tuyển...</p>
+      </div>
+    );
+  }
+
+  // 4️⃣ Render UI
   return (
-    <div className="min-h-screen py-12">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8"> {/* Thu nhỏ max-width */}
-        <div className="flex items-center gap-3 mb-8 pb-4 border-b border-gray-200">
-            <FileText className="w-8 h-8 text-indigo-600" />
-            <h1 className="text-3xl font-bold text-gray-900">Đơn ứng tuyển của tôi</h1>
-        </div>
+    <div className="min-h-screen py-12 bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8 pb-4 border-b border-gray-200">
+          Đơn Ứng Tuyển Của Tôi ({applications.length})
+        </h1>
 
-        {applicationsWithStatus.length > 0 ? (
-          // Hiển thị danh sách đơn ứng tuyển
-          <div className="space-y-4">
-            {applicationsWithStatus.map((app) => (
-              <div key={app.id} className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3">
-                  {/* Thông tin Job */}
-                  <div className="flex-grow min-w-0">
-                    <Link to={`/job/${app.id}`} className="group">
-                      <h2 className="text-base font-semibold text-gray-800 group-hover:text-indigo-600 transition-colors truncate">{app.title}</h2>
-                    </Link>
-                    <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-1 truncate">
-                      <Building size={14}/> {app.company}
-                    </p>
-                    <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-1 truncate">
-                      <MapPin size={14}/> {app.location}
-                    </p>
+        {error && <div className="error-message mb-6">{error}</div>}
+
+        {applications.length > 0 ? (
+          <div className="space-y-6">
+            {applications.map((app) => {
+              const job = app.job || {}; // ✅ fix null
+              return (
+                <div
+                  key={app._id}
+                  className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow"
+                >
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+                    {/* Job Info */}
+                    <div className="flex-grow min-w-0 mb-3 md:mb-0">
+                      <Link
+                        to={job?._id ? `/job/${job._id}` : "#"}
+                        className={`group block mb-1 ${
+                          job?._id ? "cursor-pointer" : "cursor-not-allowed"
+                        }`}
+                      >
+                        <h2 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors truncate">
+                          {job?.title || "Công việc không xác định"}
+                        </h2>
+                      </Link>
+                      <p className="text-sm text-gray-600 flex items-center gap-1.5">
+                        <Briefcase size={14} /> {job?.company || "N/A"}
+                        <span className="mx-2 text-gray-300">|</span>
+                        <MapPin size={14} /> {job?.location || "N/A"}
+                      </p>
+                    </div>
+
+                    {/* Status */}
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1.5 flex-shrink-0 ${getStatusClasses(
+                        app.status
+                      )}`}
+                    >
+                      {app.status || "Pending"}
+                    </span>
                   </div>
-                  {/* Trạng thái và Ngày nộp */}
-                  <div className="flex-shrink-0 text-xs text-right space-y-1 sm:mt-1">
-                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium ${
-                         app.status === 'Đang xem xét' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-                     }`}>
-                         {app.status === 'Đang xem xét' ? <Clock size={12}/> : <Check size={12}/>}
-                         {app.status}
-                     </span>
-                     <p className="text-gray-400">Đã nộp: {app.appliedDate}</p>
+
+                  {/* Details */}
+                  <div className="border-t border-gray-100 mt-4 pt-4 text-sm">
+                    <p className="text-gray-500 flex items-center gap-2 mb-1">
+                      <Clock size={14} />
+                      Ngày ứng tuyển:
+                      <span className="text-gray-700 font-medium">
+                        {new Date(app.applicationDate).toLocaleDateString("vi-VN")}
+                      </span>
+                    </p>
+                    <p className="text-gray-500 flex items-start gap-2">
+                      <FileText size={14} className="mt-1 flex-shrink-0" />
+                      Ghi chú:
+                      <span className="text-gray-700 flex-grow">
+                        {app.coverLetter || "Không có ghi chú thêm."}
+                      </span>
+                    </p>
                   </div>
                 </div>
-                 {/* Có thể thêm nút "Rút đơn" ở đây */}
-                 {/* <div className="mt-3 text-right">
-                    <button className="text-xs text-red-500 hover:text-red-700 hover:underline">Rút đơn ứng tuyển</button>
-                 </div> */}
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
-          // Khi chưa ứng tuyển job nào
-          <div className="text-center py-16 bg-white rounded-lg shadow-sm border border-gray-100">
+          <div className="text-center py-16 bg-white rounded-lg shadow border border-gray-100">
             <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">Bạn chưa ứng tuyển công việc nào</h3>
-            <p className="text-gray-500 mb-6 text-sm">Hãy tìm kiếm và ứng tuyển những công việc phù hợp nhé!</p>
-            <button
-              onClick={() => navigate('/jobs')}
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">
+              Bạn chưa nộp đơn ứng tuyển nào
+            </h3>
+            <p className="text-gray-500 mb-6 text-sm max-w-xs mx-auto">
+              Hãy bắt đầu tìm kiếm và ứng tuyển vào các công việc phù hợp!
+            </p>
+            <Link
+              to="/jobs"
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors text-sm shadow-sm"
             >
-              <Briefcase className="w-4 h-4" />
               Tìm việc ngay
-            </button>
+            </Link>
           </div>
         )}
       </div>
+
+      <style jsx global>{`
+        .error-message {
+          background-color: #fef2f2;
+          border: 1px solid #fecaca;
+          color: #b91c1c;
+          padding: 0.5rem 1rem;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          line-height: 1.25rem;
+        }
+      `}</style>
     </div>
   );
 }

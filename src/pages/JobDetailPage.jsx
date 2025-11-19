@@ -1,233 +1,379 @@
-import React from 'react';
-import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { MapPin, DollarSign, Clock, Star, Send, CheckCircle, Briefcase, Heart, Calendar } from 'lucide-react';
-import { allJobs } from '../data/data.js'; // Đường dẫn đúng: src/pages -> src/data/data.js
-import JobCard from '../components/JobCard'; // Đường dẫn đúng: src/pages -> src/components/JobCard.jsx
-import { useAuth } from '../context/AuthContext'; // Đường dẫn đúng: src/pages -> src/context/AuthContext.jsx
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Briefcase, MapPin, DollarSign, Clock, Users, Calendar, Loader2, Send, X, AlertTriangle, Heart, CheckCircle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
+import { LOCATIONS } from '../data/locations';
 
-// --- Component phụ ---
-const InfoItem = ({ icon: Icon, label, value, valueClass = 'text-gray-900' }) => (
-  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-    <div className="flex items-center gap-1.5 text-gray-500 mb-1">
-      <Icon className="w-4 h-4 flex-shrink-0" />
-      <span className="text-xs font-medium uppercase tracking-wider">{label}</span>
-    </div>
-    <p className={`font-semibold text-sm ${valueClass} line-clamp-2`}>{value || '-'}</p> {/* line-clamp-2 */}
-  </div>
-);
+import { API_BASE_URL } from '../config/api';
 
-const Section = ({ title, children }) => (
-  <section>
-    <h3 className="font-semibold text-lg mb-3 text-gray-800">{title}</h3>
-    {children}
-  </section>
-);
-// --- HẾT Component phụ ---
-
-
-function JobDetailPage({ savedJobs, toggleSaveJob, addApplication }) {
-  const { id } = useParams();
+function JobDetailPage({ savedJobs, toggleSaveJob }) {
+  const { jobId } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, token } = useAuth();
 
-  const jobId = parseInt(id);
-  const job = allJobs.find(j => j.id === jobId);
-  const isSaved = job ? savedJobs.includes(job.id) : false;
-  const relatedJobs = job ? allJobs.filter(j => j.type === job.type && j.id !== job.id).slice(0, 3) : [];
+  const [job, setJob] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const handleApplyClick = () => {
-    if (!isAuthenticated) {
-      alert('Bạn cần đăng nhập để ứng tuyển!');
-      navigate('/login', { state: { from: location.pathname } });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [coverLetter, setCoverLetter] = useState('');
+
+  const [isApplying, setIsApplying] = useState(false);
+  const [applyError, setApplyError] = useState(null);
+
+  const [hasApplied, setHasApplied] = useState(false);
+
+  // Fetch Job Detail
+  useEffect(() => {
+    const fetchJob = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/jobs/${jobId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+         const fetchedJob = response.data;
+
+        if (!fetchedJob || Object.keys(fetchedJob).length === 0) {
+          throw new Error("API trả về dữ liệu rỗng.");
+        }
+
+        setJob(fetchedJob);
+        console.log("Job data loaded:", fetchedJob);
+
+        if (isAuthenticated && user?.role === 'student' && token) {
+          await checkApplicationStatus(fetchedJob._id, token);
+        }
+
+      } catch (err) {
+        console.error("Error fetching job detail:", err.response || err);
+        if (err.response?.status === 404 || err.message.includes("rỗng")) {
+          setError("Không tìm thấy công việc này hoặc Job ID không hợp lệ.");
+        } else {
+          setError("Lỗi kết nối hoặc lỗi server khi tải công việc.");
+        }
+        setJob(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchJob();
+  }, [jobId, isAuthenticated, user, token]);
+
+  // Check Application Status
+  const checkApplicationStatus = async (id, currentToken) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/applications/my`, {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      });
+      const appliedJobs = (response.data || []).map(app => app.job._id || app.job);
+      setHasApplied(appliedJobs.includes(id));
+    } catch (err) {
+      setHasApplied(false);
+    }
+  }
+
+  // Handle Apply
+  const handleApply = async (e) => {
+    e.preventDefault();
+    if (!isAuthenticated || user?.role !== 'student') {
+      navigate('/login');
       return;
     }
-    if (job) {
-       addApplication(job.id); // Gọi hàm cập nhật state ứng tuyển
-       console.log(`Applying for job: ${job.title} (User ID: ${user?.id || 'demo'})`);
-       navigate('/apply-success', { state: { jobTitle: job.title } });
-    } else {
-       console.error("Job data is missing, cannot apply.");
-       alert("Đã xảy ra lỗi, không thể ứng tuyển lúc này.");
+    if (!jobId) {
+      setApplyError("Lỗi: Không tìm thấy ID công việc.");
+      return;
+    }
+
+    setIsApplying(true);
+    setApplyError(null);
+
+    try {
+      const payload = { jobId: jobId, coverLetter: coverLetter };
+
+      await axios.post(`${API_BASE_URL}/api/applications`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      alert('Ứng tuyển thành công! Đơn của bạn đã được nộp.');
+      setHasApplied(true);
+      setIsModalOpen(false);
+      setCoverLetter('');
+      navigate('/apply-success', { state: { jobTitle: job.title } });
+
+    } catch (err) {
+      console.error("Error applying for job:", err.response || err);
+      if (err.response?.status === 400 && err.response?.data?.message.includes("đã ứng tuyển")) {
+        setApplyError("Bạn đã nộp đơn cho công việc này rồi.");
+      } else {
+        setApplyError(err.response?.data?.message || 'Có lỗi xảy ra trong quá trình ứng tuyển.');
+      }
+    } finally {
+      setIsApplying(false);
     }
   };
 
-  // --- Code xử lý 404 ---
-  if (!job) {
+  // ============= RENDER LOGIC =============
+
+  // Loading State
+  if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] px-4 py-16 text-center">
-        <Briefcase className="w-20 h-20 text-gray-300 mb-6" />
-        <h1 className="text-3xl font-bold text-gray-800 mb-3">404 - Không tìm thấy công việc</h1>
-        <p className="text-gray-500 mb-8 max-w-md">
-           Rất tiếc, công việc bạn đang tìm kiếm không tồn tại, đã hết hạn hoặc đã bị xóa.
-        </p>
-        <Link
-          to="/jobs"
-          className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors text-sm shadow-md"
-        >
-          Trở về trang tìm việc
-        </Link>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Đang tải thông tin công việc...</p>
+        </div>
       </div>
     );
   }
-  // --- Hết Code xử lý 404 ---
 
+  // Error State
+  if (error || !job) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center border border-red-200">
+          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Không tìm thấy công việc</h2>
+          <p className="text-gray-600 mb-6">{error || "Công việc này không tồn tại hoặc đã bị xóa."}</p>
+          <button
+            onClick={() => navigate('/jobs')}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+          >
+            Quay lại danh sách việc làm
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  // --- JSX Hiển thị chi tiết ---
+  // Job exists - safe to destructure
+  const { _id, title, company, location, salary, type, description, requirements, benefits, postedDate, expiryDate } = job;
+  const isSaved = savedJobs.includes(_id);
+  
+  // Lấy label địa điểm từ LOCATIONS
+  const getLocationLabel = (locationValue) => {
+    if (!locationValue) return locationValue;
+    const loc = LOCATIONS.find(l => l.value === locationValue);
+    return loc ? loc.label : locationValue;
+  };
+  const locationLabel = getLocationLabel(location);
+  
+  // Tính số ngày còn lại của gói
+  const getDaysRemaining = (expiryDate) => {
+    if (!expiryDate) return null;
+    const now = new Date();
+    const expiry = new Date(expiryDate);
+    const diffTime = expiry - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+  const daysRemaining = getDaysRemaining(expiryDate);
+
   return (
-    <div className="py-12">
+    <div className="min-h-screen py-12 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        {/* Job Header */}
+        <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg border border-gray-100 mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+
+            <div className="flex-grow">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">{title}</h1>
+              <p className="text-xl text-indigo-600 font-semibold">{company}</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Ngày đăng: {postedDate ? new Date(postedDate).toLocaleDateString('vi-VN') : 'Đang cập nhật'}
+              </p>
+            </div>
+
+            {/* Apply Button */}
+            <div className="flex-shrink-0 flex gap-2 w-full md:w-auto">
+              {/* Save Button */}
+              <button
+                onClick={() => toggleSaveJob(_id)}
+                className={`py-2 px-4 rounded-lg font-medium transition-colors flex items-center gap-2 flex-shrink-0 text-sm md:py-3 md:px-5 shadow-sm ${isSaved ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                  }`}
+              >
+                <Heart className={`w-5 h-5 ${isSaved ? 'fill-red-500' : ''}`} />
+                {isSaved ? 'Đã lưu' : 'Lưu tin'}
+              </button>
+
+              {/* Apply Button */}
+              {hasApplied ? (
+                <button
+                  disabled
+                  className="w-full md:w-auto px-6 py-3 bg-gray-400 text-white rounded-lg font-bold text-sm cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <CheckCircle size={18} /> Đã Ứng Tuyển
+                </button>
+              ) : (isAuthenticated && user?.role === 'student' ? (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="w-full md:w-auto px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors shadow-md flex items-center justify-center gap-2"
+                >
+                  <Send size={18} /> Ứng Tuyển Ngay
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate('/login', { state: { from: `/job/${jobId}` } })}
+                  className="w-full md:w-auto px-6 py-3 bg-green-600 text-white rounded-lg font-bold text-sm hover:bg-green-700 transition-colors shadow-md flex items-center justify-center gap-2"
+                >
+                  Đăng nhập để ứng tuyển
+                </button>
+              ))}
+            </div>
+
+          </div>
+        </div>
+
+        {/* Job Details Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-          {/* --- CỘT CHÍNH --- */}
-          <div className="lg:col-span-2 bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
-            {/* Header */}
-            <div className="p-6 md:p-8 border-b border-gray-200">
-              <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-4">
-                {/* Job Info */}
-                <div className="flex gap-4 items-start">
-                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-3xl flex-shrink-0">
-                    {job.logo}
-                  </div>
-                  <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{job.title}</h1>
-                    <p className="text-lg text-gray-600 mt-1">{job.company}</p>
-                    <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="font-medium text-gray-700">{job.rating}</span>
-                      </span>
-                      <span className="text-gray-400 hidden sm:inline">•</span>
-                      <span>{job.applicants} ứng viên</span>
-                      <span className="text-gray-400 hidden sm:inline">•</span>
-                      <span>Đăng {job.posted}</span>
-                    </div>
-                  </div>
-                </div>
-                {/* Save Button */}
-                <button
-                  onClick={() => toggleSaveJob(job.id)}
-                  className={`py-2 px-4 rounded-lg font-medium transition-colors flex items-center gap-2 flex-shrink-0 text-sm md:py-3 md:px-5 shadow-sm ${
-                    isSaved
-                      ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
-                  }`}
-                >
-                  <Heart className={`w-5 h-5 ${isSaved ? 'fill-red-500' : ''}`} />
-                  {isSaved ? 'Đã lưu' : 'Lưu tin'}
-                </button>
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Summary */}
+            <div className="bg-white p-6 rounded-xl shadow border border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Tóm Tắt Công Việc</h3>
+              <div className="grid grid-cols-2 gap-y-3 text-sm text-gray-700">
+                <p className="flex items-center gap-2">
+                  <MapPin size={16} className="text-indigo-500" />
+                  Địa điểm: <span className="font-semibold">{locationLabel}</span>
+                </p>
+                <p className="flex items-center gap-2">
+                  <Briefcase size={16} className="text-indigo-500" />
+                  Loại hình: <span className="font-semibold">{type}</span>
+                </p>
+                <p className="flex items-center gap-2">
+                  <DollarSign size={16} className="text-indigo-500" />
+                  Mức lương: <span className="font-semibold">{salary || 'Thỏa thuận'}</span>
+                </p>
+                <p className="flex items-center gap-2">
+                  <Calendar size={16} className="text-indigo-500" />
+                  Ngày đăng: <span className="font-semibold">
+                    {postedDate ? new Date(postedDate).toLocaleDateString('vi-VN') : 'Đang cập nhật'}
+                  </span>
+                </p>
+                {daysRemaining !== null && daysRemaining > 0 && (
+                  <p className="flex items-center gap-2">
+                    <Clock size={16} className="text-blue-500" />
+                    Còn lại: <span className="font-semibold text-blue-600">
+                      {daysRemaining} ngày
+                    </span>
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* Content Sections */}
-            <div className="p-6 md:p-8 space-y-8">
-              {/* Quick Info Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <InfoItem icon={DollarSign} label="Mức lương" value={job.salary} valueClass="text-green-600" />
-                <InfoItem icon={Briefcase} label="Loại hình" value={job.type} />
-                <InfoItem icon={MapPin} label="Địa điểm" value={job.location} />
-                <InfoItem icon={Calendar} label="Thời gian" value={job.slots.join(' • ')} />
+            {/* Description */}
+            <div className="bg-white p-6 rounded-xl shadow border border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Mô Tả Công Việc</h3>
+              <div
+                className="text-gray-700 prose max-w-none"
+                dangerouslySetInnerHTML={{ __html: description?.replace(/\n/g, '<br/>') || 'Đang cập nhật mô tả.' }}
+              />
+            </div>
+
+            {/* Requirements */}
+            <div className="bg-white p-6 rounded-xl shadow border border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Yêu Cầu Ứng Viên</h3>
+              <div className="text-gray-700 prose max-w-none">
+                {Array.isArray(requirements) ? (
+                  <ul>{requirements.map((req, i) => <li key={i}>{req}</li>)}</ul>
+                ) : (
+                  <div dangerouslySetInnerHTML={{ __html: requirements?.replace(/\n/g, '<br/>') || 'Đang cập nhật yêu cầu.' }} />
+                )}
               </div>
+            </div>
 
-              {/* Description */}
-              <Section title="Mô tả công việc">
-                <p className="text-gray-700 leading-relaxed whitespace-pre-line text-sm">
-                  {job.description || 'Chưa có mô tả chi tiết.'}
-                </p>
-              </Section>
-
-              {/* Requirements */}
-              <Section title="Yêu cầu ứng viên">
-                <ul className="space-y-2 pl-1"> {/* Thêm pl-1 */}
-                  {job.requirements && job.requirements.length > 0 ? (
-                    job.requirements.map((req, index) => (
-                      <li key={index} className="flex items-start gap-2.5"> {/* Tăng gap */}
-                        <CheckCircle className="w-4 h-4 text-green-500 mt-1 flex-shrink-0" /> {/* Size nhỏ hơn */}
-                        <span className="text-gray-700 text-sm">{req}</span>
-                      </li>
-                    ))
+            {/* Benefits */}
+            {benefits && benefits.length > 0 && (
+              <div className="bg-white p-6 rounded-xl shadow border border-gray-100">
+                <h3 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Quyền Lợi</h3>
+                <div className="text-gray-700 prose max-w-none">
+                  {Array.isArray(benefits) ? (
+                    <ul>{benefits.map((ben, i) => <li key={i}>{ben}</li>)}</ul>
                   ) : (
-                    <li className="text-gray-500 text-sm italic">Chưa cập nhật yêu cầu.</li>
+                    <div dangerouslySetInnerHTML={{ __html: benefits?.replace(/\n/g, '<br/>') || 'Đang cập nhật quyền lợi.' }} />
                   )}
-                </ul>
-              </Section>
-
-              {/* Benefits */}
-              {job.benefits && job.benefits.length > 0 && (
-                <Section title="Quyền lợi">
-                  <div className="flex flex-wrap gap-2">
-                    {job.benefits.map((benefit, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium"
-                      >
-                        {benefit}
-                      </span>
-                    ))}
-                  </div>
-                </Section>
-              )}
-            </div>
-          </div>
-          {/* --- HẾT CỘT CHÍNH --- */}
-
-          {/* --- CỘT PHỤ --- */}
-          <div className="space-y-6">
-            {/* Apply Box */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 text-center sticky top-20 border border-gray-100">
-              <button
-                onClick={handleApplyClick}
-                className="w-full bg-indigo-600 text-white py-3 px-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                <Send className="w-5 h-5" />
-                {isAuthenticated ? 'Ứng tuyển ngay' : 'Đăng nhập để ứng tuyển'}
-              </button>
-              {isAuthenticated && (
-                 <p className="text-sm text-gray-500 mt-3">
-                  Nhấn để gửi hồ sơ đến nhà tuyển dụng.
-                </p>
-              )}
-              {!isAuthenticated && (
-                 <p className="text-sm text-gray-500 mt-3">
-                   Vui lòng <Link to="/login" state={{ from: location.pathname }} className="text-indigo-600 font-medium hover:underline">đăng nhập</Link> hoặc <Link to="/register" className="text-indigo-600 font-medium hover:underline">đăng ký</Link> để ứng tuyển.
-                 </p>
-              )}
-            </div>
-
-            {/* Related Jobs Box */}
-            {relatedJobs.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-                <h3 className="font-bold text-lg mb-4 text-gray-800">Việc làm liên quan</h3>
-                <div className="space-y-3">
-                  {relatedJobs.map(relatedJob => (
-                    <Link
-                      key={relatedJob.id}
-                      to={`/job/${relatedJob.id}`}
-                      className="block border border-gray-200 rounded-lg p-3 hover:bg-gray-50/70 transition-colors group" // Giảm opacity hover
-                    >
-                      <div className="flex gap-3 items-start">
-                        <div className="w-10 h-10 rounded-md bg-gray-100 flex items-center justify-center text-xl flex-shrink-0">
-                          {relatedJob.logo}
-                        </div>
-                        <div className="overflow-hidden">
-                          <p className="font-semibold text-gray-800 group-hover:text-indigo-600 text-sm line-clamp-1">{relatedJob.title}</p>
-                          <p className="text-xs text-gray-500 line-clamp-1">{relatedJob.company}</p>
-                          <p className="text-xs text-green-600 font-medium mt-1">{relatedJob.salary}</p>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
                 </div>
               </div>
             )}
           </div>
-           {/* --- HẾT CỘT PHỤ --- */}
 
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            <div className="bg-white p-6 rounded-xl shadow border border-gray-100 sticky top-4">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Về {company}</h3>
+              <p className="text-gray-700 text-sm">
+                {job.recruiter?.companyDescription || 'Công ty cam kết tạo ra môi trường làm việc chuyên nghiệp, giúp bạn phát triển kỹ năng và cân bằng giữa học tập và công việc.'}
+              </p>
+              <button
+                className="mt-4 w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-200"
+                onClick={() => navigate(`/jobs?company=${company}`)}
+              >
+                Xem thêm việc làm của {company}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Application Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl border border-gray-100">
+            <div className="flex justify-between items-center p-5 border-b">
+              <h3 className="text-xl font-bold text-gray-900">Ứng tuyển vào {title}</h3>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleApply} className="p-5 space-y-4">
+
+              {applyError && (
+                <div className="text-red-600 bg-red-50 p-3 rounded-lg border border-red-200 text-sm">
+                  {applyError}
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="coverLetter" className="block text-sm font-medium text-gray-700 mb-1">
+                  Thư giới thiệu (Cover Letter) <span className="text-gray-400">(Tùy chọn)</span>
+                </label>
+                <textarea
+                  id="coverLetter"
+                  rows="4"
+                  value={coverLetter}
+                  onChange={(e) => setCoverLetter(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Chia sẻ lý do bạn phù hợp với công việc này..."
+                ></textarea>
+              </div>
+
+              <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+                <span className="font-semibold text-indigo-600">Lưu ý:</span> Hệ thống sẽ dùng CV được tạo từ Hồ sơ cá nhân của bạn để nộp đơn.
+              </p>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isApplying}
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors shadow-md flex items-center gap-2 disabled:bg-indigo-400"
+                >
+                  {isApplying ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                  {isApplying ? 'Đang gửi...' : 'Gửi Ứng Tuyển'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
-  // --- HẾT JSX ---
 }
 
 export default JobDetailPage;

@@ -1,131 +1,307 @@
-import React, { useState, useEffect } from 'react'; // Thêm useEffect
-import { Link, useNavigate } from 'react-router-dom';
-import { Briefcase, Users, Clock, Edit, Trash2, PlusCircle, ExternalLink } from 'lucide-react';
-import { useAuth } from '../context/AuthContext'; // Đường dẫn đúng
-import { allJobs } from '../data/data.js'; // Đường dẫn đúng
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Briefcase, Plus, Edit, Trash2, Users, Eye, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
 
-// Lọc ra các job giả định là do nhà tuyển dụng này đăng (ví dụ: lấy các job có ID lẻ)
-// Trong thực tế, bạn sẽ fetch jobs của employer_id từ API
-const getEmployerJobs = (userId) => {
-    // Tạm thời lọc theo ID lẻ để demo
-    console.log("Filtering jobs for employer ID (demo):", userId);
-    return allJobs.filter(job => job.id % 2 !== 0);
+import { API_BASE_URL } from '../config/api';
+
+const STATUS_BADGE = {
+  Pending: { label: 'Chờ duyệt', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+  Approved: { label: 'Đã duyệt', color: 'bg-green-100 text-green-800', icon: CheckCircle },
+  Rejected: { label: 'Bị từ chối', color: 'bg-red-100 text-red-800', icon: XCircle }
 };
 
-
 function EmployerDashboardPage() {
-  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  // State để lưu jobs, khởi tạo bằng cách gọi hàm lọc
+  const { token, user } = useAuth();
+  
   const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, jobId: null, jobTitle: '' });
 
-  // useEffect để lọc jobs và kiểm tra quyền truy cập *sau khi* component mount và user context sẵn sàng
+  // Fetch jobs của recruiter
   useEffect(() => {
-    if (!isAuthenticated || user?.role !== 'employer') {
-      console.log("Redirecting: Not authenticated or not an employer.");
-      navigate('/login', { replace: true, state: { from: '/employer/dashboard' } }); // Chuyển về login nếu chưa đúng
-    } else {
-      // Nếu đúng là employer, lọc jobs
-      setJobs(getEmployerJobs(user.id)); // Truyền user.id vào hàm lọc (dù hàm demo chưa dùng)
+    const fetchJobs = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/jobs/my`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setJobs(response.data);
+      } catch (err) {
+        console.error("Error fetching jobs:", err);
+        setError(err.response?.data?.message || "Không thể tải danh sách công việc.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchJobs();
     }
-  }, [isAuthenticated, user, navigate]); // Chạy lại khi user thay đổi
+  }, [token]);
 
-
-  // Hàm xóa job (mô phỏng)
-  const handleDeleteJob = (jobId) => {
-    if (window.confirm(`Bạn có chắc muốn xóa tin tuyển dụng #${jobId}?`)) {
-      setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
-      // TODO: Gọi API xóa job trên backend với jobId
-      console.log('Deleted job ID:', jobId);
-      alert(`Đã xóa tin tuyển dụng #${jobId} (demo).`);
+  // Delete job
+  const handleDelete = async (jobId) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/api/jobs/${jobId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setJobs(prev => prev.filter(job => job._id !== jobId));
+      setDeleteModal({ isOpen: false, jobId: null, jobTitle: '' });
+      alert('✅ Xóa tin tuyển dụng thành công!');
+    } catch (err) {
+      console.error("Error deleting job:", err);
+      alert(err.response?.data?.message || 'Lỗi khi xóa tin tuyển dụng.');
     }
   };
 
-  // Hiển thị loading hoặc thông báo nếu chưa xác thực xong hoặc không đúng role
-   if (!user || user.role !== 'employer') {
-    // Vẫn render UI cơ bản trong khi chờ useEffect redirect hoặc khi user không đúng
+  // Loading state
+  if (loading) {
     return (
-        <div className="min-h-screen bg-gray-50 py-12">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                 <h1 className="text-2xl font-semibold text-gray-700">Truy cập bị từ chối</h1>
-                 <p className="text-gray-500 mt-2">Bạn cần đăng nhập với tài khoản Nhà tuyển dụng để xem trang này.</p>
-                 <Link to="/login" className="mt-4 inline-block px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Đăng nhập</Link>
-            </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Đang tải danh sách tin tuyển dụng...</p>
         </div>
+      </div>
     );
   }
 
+  // Stats
+  const stats = {
+    total: jobs.length,
+    pending: jobs.filter(j => j.status === 'Pending').length,
+    approved: jobs.filter(j => j.status === 'Approved').length,
+    rejected: jobs.filter(j => j.status === 'Rejected').length
+  };
 
-  // --- Giao diện Dashboard khi đã xác thực là Employer ---
   return (
-    <div className="min-h-screen py-12"> {/* Bỏ bg-gray-50 */}
+    <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header Dashboard */}
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 pb-4 border-b border-gray-200">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Quản lý tin tuyển dụng</h1>
-          <Link
-            to="/post-job"
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors text-sm shadow-sm"
-          >
-            <PlusCircle className="w-5 h-5" />
-            Đăng tin mới
-          </Link>
+        
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Nhà Tuyển Dụng</h1>
+          <p className="text-gray-600">Xin chào, <span className="font-semibold text-indigo-600">{user?.name}</span>! Quản lý tin tuyển dụng của bạn.</p>
         </div>
 
-        {/* Danh sách Job đã đăng */}
-        {jobs.length > 0 ? (
-          <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
-            <ul className="divide-y divide-gray-200">
-              {jobs.map((job) => (
-                <li key={job.id} className="p-4 hover:bg-gray-50/50 transition-colors"> {/* Nền hover nhẹ hơn */}
-                  <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
-                    {/* Thông tin Job */}
-                    <div className="flex-grow min-w-0"> {/* Thêm min-w-0 để truncate hoạt động */}
-                      <Link to={`/job/${job.id}`} className="block mb-1 group" title={`Xem chi tiết: ${job.title}`}>
-                        <h2 className="text-base md:text-lg font-semibold text-gray-800 group-hover:text-indigo-600 transition-colors truncate">{job.title}</h2> {/* truncate */}
-                        <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-1 truncate"> {/* truncate */}
-                          <Briefcase size={14}/> {job.company} - {job.location}
-                        </p>
-                      </Link>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 mt-2">
-                         <span className="flex items-center gap-1"><Users size={12}/> {job.applicants} ứng viên</span>
-                         <span className="flex items-center gap-1"><Clock size={12}/> Đăng {job.posted}</span>
-                         {/* TODO: Thêm trạng thái (Ví dụ: Đang hiển thị, Hết hạn) từ API */}
-                         <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">Đang hiển thị</span>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Tổng tin</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
+              </div>
+              <Briefcase className="w-12 h-12 text-indigo-600 opacity-20" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Chờ duyệt</p>
+                <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
+              </div>
+              <Clock className="w-12 h-12 text-yellow-600 opacity-20" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Đã duyệt</p>
+                <p className="text-3xl font-bold text-green-600">{stats.approved}</p>
+              </div>
+              <CheckCircle className="w-12 h-12 text-green-600 opacity-20" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Bị từ chối</p>
+                <p className="text-3xl font-bold text-red-600">{stats.rejected}</p>
+              </div>
+              <XCircle className="w-12 h-12 text-red-600 opacity-20" />
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Tin tuyển dụng của tôi</h2>
+          <button
+            onClick={() => navigate('/post-job')}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md flex items-center gap-2"
+          >
+            <Plus size={20} />
+            Đăng tin mới
+          </button>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+            <p className="text-red-600">{error}</p>
+          </div>
+        )}
+
+        {/* Jobs List */}
+        {jobs.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-16 text-center">
+            <Briefcase className="w-20 h-20 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Chưa có tin tuyển dụng nào</h3>
+            <p className="text-gray-500 mb-6">Bắt đầu đăng tin để tìm kiếm ứng viên phù hợp!</p>
+            <button
+              onClick={() => navigate('/post-job')}
+              className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md"
+            >
+              Đăng tin đầu tiên
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {jobs.map((job) => {
+              const StatusIcon = STATUS_BADGE[job.status]?.icon || Clock;
+              
+              return (
+                <div
+                  key={job._id}
+                  className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                    
+                    {/* Job Info */}
+                    <div className="flex-1">
+                      <div className="flex items-start gap-4">
+                        {/* Logo */}
+                        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-2xl flex-shrink-0">
+                          {job.logo || '💼'}
+                        </div>
+                        
+                        {/* Details */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-xl font-bold text-gray-900 truncate">
+                              {job.title}
+                            </h3>
+                            {/* Status Badge */}
+                            <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${STATUS_BADGE[job.status]?.color} flex-shrink-0`}>
+                              <StatusIcon size={12} />
+                              {STATUS_BADGE[job.status]?.label}
+                            </div>
+                          </div>
+                          
+                          <p className="text-gray-600 mb-3">{job.company}</p>
+                          
+                          <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+                            <span className="flex items-center gap-1">
+                              <Briefcase size={14} />
+                              {job.type}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Users size={14} />
+                              {job.applicantsCount || 0} ứng viên
+                            </span>
+                            <span>
+                              Đăng: {job.postedDate ? new Date(job.postedDate).toLocaleDateString('vi-VN') : new Date(job.createdAt).toLocaleDateString('vi-VN')}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Nút hành động */}
-                    <div className="flex items-center gap-2 flex-shrink-0 mt-2 sm:mt-0">
-                       <button
-                         onClick={() => navigate(`/job/${job.id}`)}
-                         className="p-1.5 md:p-2 text-gray-400 hover:text-indigo-600 bg-gray-100 hover:bg-indigo-50 rounded-md transition-colors" title="Xem chi tiết"
-                       > <ExternalLink size={14}/> </button> {/* Size nhỏ hơn */}
-                       <button className="p-1.5 md:p-2 text-gray-400 hover:text-blue-600 bg-gray-100 hover:bg-blue-50 rounded-md transition-colors cursor-not-allowed" title="Chỉnh sửa (chưa hoạt động)" disabled> <Edit size={14}/> </button> {/* Disable nút sửa */}
-                       <button onClick={() => handleDeleteJob(job.id)} className="p-1.5 md:p-2 text-gray-400 hover:text-red-600 bg-gray-100 hover:bg-red-50 rounded-md transition-colors" title="Xóa"> <Trash2 size={14}/> </button>
+                    {/* Actions */}
+                    <div className="flex flex-wrap lg:flex-col gap-2 lg:w-48 flex-shrink-0">
+                      
+                      {/* ⭐ NÚT XEM ỨNG VIÊN - QUAN TRỌNG */}
+                      <button
+                        onClick={() => navigate(`/employer/job/${job._id}/applicants`)}
+                        className="flex-1 lg:w-full px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-md"
+                      >
+                        <Users size={16} />
+                        Xem ứng viên ({job.applicantsCount || 0})
+                      </button>
+
+                      {/* Xem chi tiết */}
+                      <button
+                        onClick={() => navigate(`/job/${job._id}`)}
+                        className="flex-1 lg:w-full px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Eye size={16} />
+                        Xem tin
+                      </button>
+
+                      {/* Chỉnh sửa (nếu cần) */}
+                      {/* <button
+                        onClick={() => navigate(`/edit-job/${job._id}`)}
+                        className="flex-1 lg:w-full px-4 py-2.5 bg-blue-100 text-blue-700 rounded-lg font-semibold hover:bg-blue-200 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Edit size={16} />
+                        Sửa
+                      </button> */}
+
+                      {/* Xóa */}
+                      <button
+                        onClick={() => setDeleteModal({ isOpen: true, jobId: job._id, jobTitle: job.title })}
+                        className="flex-1 lg:w-full px-4 py-2.5 bg-red-100 text-red-700 rounded-lg font-semibold hover:bg-red-200 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Trash2 size={16} />
+                        Xóa
+                      </button>
                     </div>
+
                   </div>
-                </li>
-              ))}
-            </ul>
-             {/* Có thể thêm phân trang ở đây */}
-          </div>
-        ) : (
-          // Khi chưa đăng job nào
-          <div className="text-center py-16 bg-white rounded-lg shadow border border-gray-200">
-            <Briefcase className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">Bạn chưa đăng tin tuyển dụng nào</h3>
-            <p className="text-gray-500 mb-6 text-sm max-w-xs mx-auto">Hãy bắt đầu đăng tin để tìm kiếm ứng viên tài năng cho công ty của bạn.</p>
-            <Link
-              to="/post-job"
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors text-sm shadow-sm"
-            >
-              <PlusCircle className="w-5 h-5" />
-              Đăng tin ngay
-            </Link>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="p-6">
+              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mx-auto mb-4">
+                <Trash2 className="w-8 h-8 text-red-600" />
+              </div>
+              
+              <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
+                Xác nhận xóa tin tuyển dụng
+              </h3>
+              
+              <p className="text-gray-600 text-center mb-6">
+                Bạn có chắc chắn muốn xóa tin <span className="font-semibold">"{deleteModal.jobTitle}"</span>? 
+                Hành động này không thể hoàn tác và tất cả đơn ứng tuyển liên quan cũng sẽ bị xóa.
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteModal({ isOpen: false, jobId: null, jobTitle: '' })}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={() => handleDelete(deleteModal.jobId)}
+                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
+                >
+                  Xóa tin
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
